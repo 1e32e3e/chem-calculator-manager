@@ -1,479 +1,9 @@
-// 渲染脚本列表
-        function renderScripts(filteredScripts = null) {
-            const scriptsToShow = filteredScripts || scripts;
-            const container = document.getElementById('scriptsContainer');
-            
-            if (scriptsToShow.length === 0) {
-                container.innerHTML = `
-                    <div class="empty-state">
-                        <h3>${filteredScripts ? '没有找到匹配的脚本' : '还没有脚本记录'}</h3>
-                        <p>${filteredScripts ? '尝试修改搜索条件或选择其他分类' : '点击"添加新脚本"开始管理你的第一个脚本'}</p>
-                    </div>
-    
-    <!-- 文件上传模态框 -->
-    <div id="fileUploadModal" class="modal">
-        <div class="modal-content">
-            <h2>从文件导入计算记录</h2>
-            
-            <div class="file-drop-zone" onclick="triggerFileInput()" ondrop="handleFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                <div class="file-drop-icon">📁</div>
-                <div class="file-drop-text">拖拽文件到这里或点击选择</div>
-                <div class="file-drop-hint">支持 .out, .log, .gjf, .com 等计算化学文件</div>
-            </div>
-            
-            <input type="file" id="calcFileInput" class="file-input" accept=".out,.log,.gjf,.com,.xyz,.mol" onchange="handleFileSelect(event)" multiple>
-            
-            <div id="filePreviewContainer"></div>
-            
-            <div style="text-align: right; margin-top: 25px;">
-                <button type="button" class="btn btn-secondary" onclick="closeFileUploadModal()">取消</button>
-                <button type="button" class="btn btn-primary" onclick="processUploadedFiles()" style="margin-left: 10px;">处理文件</button>
-            </div>
-        </div>
-    </div>
-    
-    <!-- 脚本文件上传模态框 -->
-    <div id="scriptFileUploadModal" class="modal">
-        <div class="modal-content">
-            <h2>从文件导入脚本</h2>
-            
-            <div class="file-drop-zone" onclick="triggerScriptFileInput()" ondrop="handleScriptFileDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                <div class="file-drop-icon">🐍</div>
-                <div class="file-drop-text">拖拽脚本文件到这里或点击选择</div>
-                <div class="file-drop-hint">支持 .py, .sh 脚本文件</div>
-            </div>
-            
-            <input type="file" id="scriptFileInput" class="file-input" accept=".py,.sh,.bash" onchange="handleScriptFileSelect(event)" multiple>
-            
-            <div id="scriptFilePreviewContainer"></div>
-            
-            <div style="text-align: right; margin-top: 25px;">
-                <button type="button" class="btn btn-secondary" onclick="closeScriptFileUploadModal()">取消</button>
-                <button type="button" class="btn btn-primary" onclick="processUploadedScripts()" style="margin-left: 10px;">导入脚本</button>
-            </div>
-        </div>
-    </div>
-                `;
-                return;
-            }
-            
-            const scriptsHtml = scriptsToShow.map(script => `
-                <div class="script-card">
-                    <div class="script-header">
-                        <div class="script-title">${script.name}</div>
-                        <span class="script-language language-${script.language}">${script.language.toUpperCase()}</span>
-                    </div>
-                    
-                    <div class="script-description">${script.description}</div>
-                    
-                    <div class="script-meta">
-                        <span>📁 分类: ${script.category}</span>
-                        <span>📅 创建: ${script.date}</span>
-                        ${script.dependencies ? `<span>📦 依赖: ${script.dependencies}</span>` : ''}
-                    </div>
-                    
-                    ${script.usage ? `
-                        <div style="margin-top: 10px;">
-                            <strong>使用示例:</strong>
-                            <div class="code-block">${script.usage}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${script.code ? `
-                        <div style="margin-top: 10px;">
-                            <strong>代码:</strong>
-                            <div class="code-block">${script.code}</div>
-                        </div>
-                    ` : ''}
-                    
-                    ${script.filepath ? `
-                        <div style="margin-top: 10px;">
-                            <strong>文件路径:</strong> <code>${script.filepath}</code>
-                        </div>
-                    ` : ''}
-                    
-                    ${script.notes ? `
-                        <div style="margin-top: 10px;">
-                            <strong>备注:</strong> ${script.notes}
-                        </div>
-                    ` : ''}
-                    
-                    <div class="script-actions">
-                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;" onclick="editScript(${script.id})">编辑</button>
-                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;" onclick="duplicateScript(${script.id})">复制</button>
-                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;" onclick="deleteScript(${script.id})">删除</button>
-                    </div>
-                </div>
-            `).join('');
-            
-            container.innerHTML = scriptsHtml;
-        }
-        
-        // 按分类过滤脚本
-        function filterScriptsByCategory(element, category) {
-            // 更新按钮状态
-            document.querySelectorAll('.category-filter').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            element.classList.add('active');
-            
-            currentScriptFilter = category;
-            
-            // 过滤脚本
-            let filtered = scripts;
-            if (category !== 'all') {
-                filtered = scripts.filter(script => script.category === category);
-            }
-            
-            // 如果还有搜索条件，同时应用
-            const searchTerm = document.getElementById('scriptSearchInput').value.toLowerCase();
-            if (searchTerm) {
-                filtered = filtered.filter(script => 
-                    script.name.toLowerCase().includes(searchTerm) ||
-                    script.description.toLowerCase().includes(searchTerm) ||
-                    script.category.toLowerCase().includes(searchTerm) ||
-                    (script.notes && script.notes.toLowerCase().includes(searchTerm))
-                );
-            }
-            
-            renderScripts(filtered);
-        }
-        
-        // 搜索脚本
-        function filterScripts() {
-            const searchTerm = document.getElementById('scriptSearchInput').value.toLowerCase();
-            
-            let filtered = scripts;
-            
-            // 应用分类过滤
-            if (currentScriptFilter !== 'all') {
-                filtered = filtered.filter(script => script.category === currentScriptFilter);
-            }
-            
-            // 应用搜索过滤
-            if (searchTerm) {
-                filtered = filtered.filter(script => 
-                    script.name.toLowerCase().includes(searchTerm) ||
-                    script.description.toLowerCase().includes(searchTerm) ||
-                    script.category.toLowerCase().includes(searchTerm) ||
-                    (script.notes && script.notes.toLowerCase().includes(searchTerm))
-                );
-            }
-            
-            renderScripts(filtered);
-        }
-        
-        // 删除脚本
-        function deleteScript(id) {
-            if (confirm('确定要删除这个脚本吗？')) {
-                scripts = scripts.filter(s => s.id !== id);
-                saveScripts();
-                updateScriptStats();
-                renderScripts();
-            }
-        }
-        
-        // 复制脚本
-        function duplicateScript(id) {
-            const script = scripts.find(s => s.id === id);
-            if (script) {
-                const newScript = {
-                    ...script,
-                    id: Date.now(),
-                    name: script.name + '_副本',
-                    date: new Date().toISOString().split('T')[0]
-                };
-                scripts.push(newScript);
-                saveScripts();
-                updateScriptStats();
-                renderScripts();
-            }
-        }
-        
-        // 编辑脚本（暂时用alert提示，后续可以改为编辑模态框）
-        function editScript(id) {
-            alert('编辑功能即将开发！现在可以先复制一个新版本进行修改。');
-        }
-        
-        // 导出脚本列表
-        function exportScripts() {
-            const csv = [
-                ['脚本名称', '语言', '分类', '描述', '使用示例', '文件路径', '依赖', '备注', '创建日期'],
-                ...scripts.map(s => [
-                    s.name,
-                    s.language,
-                    s.category,
-                    s.description,
-                    s.usage,
-                    s.filepath,
-                    s.dependencies,
-                    s.notes,
-                    s.date
-                ])
-            ].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
-            
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.download = `脚本列表_${new Date().toISOString().split('T')[0]}.csv`;
-            link.click();
-        }
-        
-        // 文件拖拽处理
-        function handleDragOver(event) {
-            event.preventDefault();
-            event.currentTarget.classList.add('drag-over');
-        }
-        
-        function handleDragLeave(event) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('drag-over');
-        }
-        
-        function handleFileDrop(event) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('drag-over');
-            const files = Array.from(event.dataTransfer.files);
-            processFiles(files, 'calc');
-        }
-        
-        function handleScriptFileDrop(event) {
-            event.preventDefault();
-            event.currentTarget.classList.remove('drag-over');
-            const files = Array.from(event.dataTransfer.files);
-            processFiles(files, 'script');
-        }
-        
-        function triggerFileInput() {
-            document.getElementById('calcFileInput').click();
-        }
-        
-        function triggerScriptFileInput() {
-            document.getElementById('scriptFileInput').click();
-        }
-        
-        function handleFileSelect(event) {
-            const files = Array.from(event.target.files);
-            processFiles(files, 'calc');
-        }
-        
-        function handleScriptFileSelect(event) {
-            const files = Array.from(event.target.files);
-            processFiles(files, 'script');
-        }
-        
-        // 处理上传的文件
-        function processFiles(files, type) {
-            if (type === 'calc') {
-                uploadedFiles = files;
-                displayFilePreview(files, 'filePreviewContainer');
-            } else if (type === 'script') {
-                uploadedScriptFiles = files;
-                displayScriptFilePreview(files, 'scriptFilePreviewContainer');
-            }
-        }
-        
-        // 显示文件预览
-        function displayFilePreview(files, containerId) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            files.forEach((file, index) => {
-                const preview = document.createElement('div');
-                preview.className = 'file-preview';
-                preview.innerHTML = `
-                    <div class="file-info">
-                        <span class="file-name">${file.name}</span>
-                        <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
-                    </div>
-                    <div style="color: #6b7280; font-size: 0.9rem;">
-                        类型: ${file.type || '未知'} | 修改时间: ${new Date(file.lastModified).toLocaleDateString()}
-                    </div>
-                `;
-                container.appendChild(preview);
-            });
-            
-            if (files.length > 0) {
-                const notice = document.createElement('div');
-                notice.className = 'auto-fill-notice';
-                notice.innerHTML = `📋 已选择 ${files.length} 个文件，系统将尝试自动提取计算信息`;
-                container.appendChild(notice);
-            }
-        }
-        
-        // 显示脚本文件预览
-        function displayScriptFilePreview(files, containerId) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            files.forEach((file, index) => {
-                const fileExt = file.name.split('.').pop().toLowerCase();
-                const language = fileExt === 'py' ? 'Python' : fileExt === 'sh' || fileExt === 'bash' ? 'Bash' : '未知';
-                
-                const preview = document.createElement('div');
-                preview.className = 'file-preview';
-                preview.innerHTML = `
-                    <div class="file-info">
-                        <span class="file-name">${file.name}</span>
-                        <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
-                    </div>
-                    <div style="color: #6b7280; font-size: 0.9rem;">
-                        语言: ${language} | 修改时间: ${new Date(file.lastModified).toLocaleDateString()}
-                    </div>
-                `;
-                container.appendChild(preview);
-            });
-            
-            if (files.length > 0) {
-                const notice = document.createElement('div');
-                notice.className = 'auto-fill-notice';
-                notice.innerHTML = `🐍 已选择 ${files.length} 个脚本文件，将自动读取代码内容`;
-                container.appendChild(notice);
-            }
-        }
-        
-        // 处理上传的计算文件
-        async function processUploadedFiles() {
-            if (uploadedFiles.length === 0) {
-                alert('请先选择文件');
-                return;
-            }
-            
-            for (const file of uploadedFiles) {
-                try {
-                    const content = await readFileContent(file);
-                    const extractedInfo = extractCalculationInfo(content, file.name);
-                    
-                    // 创建计算记录
-                    const record = {
-                        id: Date.now() + Math.random(),
-                        molecule: extractedInfo.molecule || file.name.split('.')[0],
-                        structure: extractedInfo.structure || '',
-                        method: extractedInfo.method || '',
-                        basis: extractedInfo.basis || '',
-                        calcType: extractedInfo.calcType || '',
-                        energy: extractedInfo.energy,
-                        filepath: file.name,
-                        notes: `从文件 ${file.name} 自动导入`,
-                        date: new Date().toISOString().split('T')[0]
-                    };
-                    
-                    records.push(record);
-                } catch (error) {
-                    console.error(`处理文件 ${file.name} 时出错:`, error);
-                    alert(`处理文件 ${file.name} 时出错，请检查文件格式`);
-                }
-            }
-            
-            saveRecords();
-            updateStats();
-            renderRecords();
-            closeFileUploadModal();
-            alert(`成功导入 ${uploadedFiles.length} 个计算记录！`);
-        }
-        
-        // 处理上传的脚本文件
-        async function processUploadedScripts() {
-            if (uploadedScriptFiles.length === 0) {
-                alert('请先选择脚本文件');
-                return;
-            }
-            
-            for (const file of uploadedScriptFiles) {
-                try {
-                    const content = await readFileContent(file);
-                    const fileExt = file.name.split('.').pop().toLowerCase();
-                    const language = fileExt === 'py' ? 'python' : fileExt === 'sh' || fileExt === 'bash' ? 'bash' : 'other';
-                    
-                    const script = {
-                        id: Date.now() + Math.random(),
-                        name: file.name,
-                        language: language,
-                        category: '其他', // 用户稍后可以修改
-                        description: `从文件 ${file.name} 自动导入的脚本`,
-                        usage: '',
-                        code: content,
-                        filepath: file.name,
-                        dependencies: '',
-                        notes: `自动导入于 ${new Date().toLocaleString()}`,
-                        date: new Date().toISOString().split('T')[0]
-                    };
-                    
-                    scripts.push(script);
-                } catch (error) {
-                    console.error(`处理脚本文件 ${file.name} 时出错:`, error);
-                    alert(`处理脚本文件 ${file.name} 时出错`);
-                }
-            }
-            
-            saveScripts();
-            updateScriptStats();
-            renderScripts();
-            closeScriptFileUploadModal();
-            alert(`成功导入 ${uploadedScriptFiles.length} 个脚本！`);
-        }
-        
-        // 读取文件内容
-        function readFileContent(file) {
-            return new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = e => resolve(e.target.result);
-                reader.onerror = reject;
-                reader.readAsText(file);
-            });
-        }
-        
-        // 简单的计算信息提取（可以根据你的需要扩展）
-        function extractCalculationInfo(content, filename) {
-            const info = {
-                molecule: '',
-                method: '',
-                basis: '',
-                energy: null,
-                calcType: '',
-                structure: ''
-            };
-            
-            // 尝试提取能量（简单的正则表达式匹配）
-            const energyPatterns = [
-                /SCF Done:.*E\(.*\)\s*=\s*([-\d.]+)/i,
-                /FINAL SINGLE POINT ENERGY\s*([-\d.]+)/i,
-                /Total Energy\s*=\s*([-\d.]+)/i,
-                /E\(RB3LYP\)\s*=\s*([-\d.]+)/i
-            ];
-            
-            for (const pattern of energyPatterns) {
-                const match = content.match(pattern);
-                if (match) {
-                    info.energy = parseFloat(match[1]);
-                    break;
-                }
-            }
-            
-            // 尝试提取方法
-            if (content.includes('B3LYP')) info.method = 'DFT-B3LYP';
-            else if (content.includes('M06-2X')) info.method = 'DFT-M06-2X';
-            else if (content.includes('wB97XD')) info.method = 'DFT-wB97XD';
-            else if (content.includes('MP2')) info.method = 'MP2';
-            
-            // 尝试提取基组
-            if (content.includes('6-31G(d)')) info.basis = '6-31G(d)';
-            else if (content.includes('6-31+G(d,p)')) info.basis = '6-31+G(d,p)';
-            else if (content.includes('cc-pVDZ')) info.basis = 'cc-pVDZ';
-            else if (content.includes('def2-TZVP')) info.basis = 'def2-TZVP';
-            
-            // 尝试提取计算类型
-            if (content.includes('optimization') || content.includes('Optimization')) info.calcType = '优化';
-            else if (content.includes('frequency') || content.includes('Frequency')) info.calcType = '频率';
-            else if (content.includes('Single Point')) info.calcType = '单点';
-            
-            return info;
-        }<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>计算化学管理系统 - GitHub Pages版</title>
+    <title>计算化学管理系统 - 简化版</title>
     <style>
         * {
             margin: 0;
@@ -536,21 +66,16 @@
             transform: translateY(-2px);
         }
         
+        .main-content {
+            padding: 30px;
+        }
+        
         .tab-content {
             display: none;
         }
         
         .tab-content.active {
             display: block;
-        }
-        
-        .header p {
-            opacity: 0.9;
-            font-size: 1.1rem;
-        }
-        
-        .main-content {
-            padding: 30px;
         }
         
         .stats-grid {
@@ -623,6 +148,49 @@
             min-width: 250px;
         }
         
+        .file-drop-zone {
+            border: 2px dashed #d1d5db;
+            border-radius: 10px;
+            padding: 40px 20px;
+            text-align: center;
+            background: #f9fafb;
+            transition: all 0.3s ease;
+            margin: 20px 0;
+            cursor: pointer;
+        }
+        
+        .file-drop-zone.drag-over {
+            border-color: #4f46e5;
+            background: #eef2ff;
+            transform: scale(1.02);
+        }
+        
+        .file-drop-zone:hover {
+            border-color: #6b7280;
+            background: #f3f4f6;
+        }
+        
+        .file-drop-icon {
+            font-size: 3rem;
+            color: #9ca3af;
+            margin-bottom: 15px;
+        }
+        
+        .file-drop-text {
+            color: #6b7280;
+            font-size: 1.1rem;
+            margin-bottom: 10px;
+        }
+        
+        .file-drop-hint {
+            color: #9ca3af;
+            font-size: 0.9rem;
+        }
+        
+        .file-input {
+            display: none;
+        }
+        
         .records-table {
             width: 100%;
             border-collapse: collapse;
@@ -649,66 +217,10 @@
             background: #f8fafc;
         }
         
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        
-        .modal-content {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: white;
-            padding: 30px;
-            border-radius: 15px;
-            width: 90%;
-            max-width: 500px;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: 500;
-            color: #374151;
-        }
-        
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            width: 100%;
-            padding: 10px;
-            border: 1px solid #e2e8f0;
-            border-radius: 6px;
-            font-size: 1rem;
-        }
-        
-        .form-group textarea {
-            height: 80px;
-            resize: vertical;
-        }
-        
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: #64748b;
-        }
-        
-        .empty-state h3 {
-            margin-bottom: 10px;
-            color: #374151;
+        .energy-value {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #059669;
         }
         
         .tag {
@@ -719,12 +231,6 @@
             border-radius: 4px;
             font-size: 0.8rem;
             margin-right: 5px;
-        }
-        
-        .energy-value {
-            font-family: 'Courier New', monospace;
-            font-weight: bold;
-            color: #059669;
         }
         
         .script-card {
@@ -778,13 +284,6 @@
             line-height: 1.5;
         }
         
-        .script-meta {
-            display: flex;
-            gap: 20px;
-            font-size: 0.9rem;
-            color: #64748b;
-        }
-        
         .script-actions {
             margin-top: 15px;
             display: flex;
@@ -805,78 +304,66 @@
             overflow-y: auto;
         }
         
-        .script-categories {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-        
-        .category-filter {
-            padding: 8px 16px;
-            background: #f1f5f9;
-            border: 1px solid #e2e8f0;
-            border-radius: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            font-size: 0.9rem;
-        }
-        
-        .category-filter.active {
-            background: #4f46e5;
-            color: white;
-            border-color: #4f46e5;
-        }
-        
-        .category-filter:hover {
-            background: #e2e8f0;
-        }
-        
-        .category-filter.active:hover {
-            background: #3730a3;
-        }
-        
-        .file-drop-zone {
-            border: 2px dashed #d1d5db;
-            border-radius: 10px;
-            padding: 40px 20px;
+        .empty-state {
             text-align: center;
-            background: #f9fafb;
-            transition: all 0.3s ease;
-            margin: 20px 0;
-            cursor: pointer;
+            padding: 60px 20px;
+            color: #64748b;
         }
         
-        .file-drop-zone.drag-over {
-            border-color: #4f46e5;
-            background: #eef2ff;
-            transform: scale(1.02);
-        }
-        
-        .file-drop-zone:hover {
-            border-color: #6b7280;
-            background: #f3f4f6;
-        }
-        
-        .file-drop-icon {
-            font-size: 3rem;
-            color: #9ca3af;
-            margin-bottom: 15px;
-        }
-        
-        .file-drop-text {
-            color: #6b7280;
-            font-size: 1.1rem;
+        .empty-state h3 {
             margin-bottom: 10px;
+            color: #374151;
         }
         
-        .file-drop-hint {
-            color: #9ca3af;
-            font-size: 0.9rem;
-        }
-        
-        .file-input {
+        .modal {
             display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.5);
+            z-index: 1000;
+        }
+        
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 30px;
+            border-radius: 15px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #374151;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+        
+        .form-group textarea {
+            height: 80px;
+            resize: vertical;
         }
         
         .file-preview {
@@ -904,13 +391,13 @@
             font-size: 0.9rem;
         }
         
-        .auto-fill-notice {
-            background: #dbeafe;
-            border: 1px solid #93c5fd;
+        .success-notice {
+            background: #dcfce7;
+            border: 1px solid #86efac;
             border-radius: 6px;
             padding: 10px;
             margin: 15px 0;
-            color: #1e40af;
+            color: #166534;
             font-size: 0.9rem;
         }
     </style>
@@ -919,7 +406,7 @@
     <div class="container">
         <div class="header">
             <h1>计算化学管理系统</h1>
-            <p>让你的计算文件井井有条 | GitHub Pages版</p>
+            <p>简化版 - 稳定可靠的文件和脚本管理</p>
             <div class="nav-tabs">
                 <button class="nav-tab active" onclick="switchTab('calculations')">计算记录</button>
                 <button class="nav-tab" onclick="switchTab('scripts')">脚本管理</button>
@@ -949,16 +436,16 @@
                 </div>
                 
                 <div class="controls">
-                    <button class="btn btn-primary" onclick="openModal()">+ 添加新计算</button>
-                    <button class="btn btn-secondary" onclick="openFileUploadModal()">📁 从文件导入</button>
+                    <button class="btn btn-primary" onclick="openAddModal()">+ 添加新计算</button>
+                    <button class="btn btn-secondary" onclick="openFileUpload()">📁 从文件导入</button>
                     <input type="text" class="search-box" placeholder="搜索分子名称、方法或备注..." id="searchInput" oninput="filterRecords()">
-                    <button class="btn btn-secondary" onclick="exportData()">导出数据</button>
+                    <button class="btn btn-secondary" onclick="exportRecords()">导出数据</button>
                 </div>
                 
                 <div id="recordsContainer">
                     <div class="empty-state">
                         <h3>还没有计算记录</h3>
-                        <p>点击"添加新计算"开始记录你的第一个计算</p>
+                        <p>点击"添加新计算"或"从文件导入"开始记录你的第一个计算</p>
                     </div>
                 </div>
             </div>
@@ -991,20 +478,10 @@
                     <button class="btn btn-secondary" onclick="exportScripts()">导出脚本列表</button>
                 </div>
                 
-                <div class="script-categories">
-                    <div class="category-filter active" data-category="all" onclick="filterScriptsByCategory(this, 'all')">全部</div>
-                    <div class="category-filter" data-category="能量提取" onclick="filterScriptsByCategory(this, '能量提取')">能量提取</div>
-                    <div class="category-filter" data-category="结构处理" onclick="filterScriptsByCategory(this, '结构处理')">结构处理</div>
-                    <div class="category-filter" data-category="构象分析" onclick="filterScriptsByCategory(this, '构象分析')">构象分析</div>
-                    <div class="category-filter" data-category="格式转换" onclick="filterScriptsByCategory(this, '格式转换')">格式转换</div>
-                    <div class="category-filter" data-category="数据分析" onclick="filterScriptsByCategory(this, '数据分析')">数据分析</div>
-                    <div class="category-filter" data-category="其他" onclick="filterScriptsByCategory(this, '其他')">其他</div>
-                </div>
-                
                 <div id="scriptsContainer">
                     <div class="empty-state">
                         <h3>还没有脚本记录</h3>
-                        <p>点击"添加新脚本"开始管理你的第一个脚本</p>
+                        <p>点击"添加新脚本"或"从文件导入脚本"开始管理你的第一个脚本</p>
                     </div>
                 </div>
             </div>
@@ -1036,7 +513,7 @@
                         <option value="MP2">MP2</option>
                         <option value="CCSD(T)">CCSD(T)</option>
                         <option value="HF">HF</option>
-                        <option value="Other">其他</option>
+                        <option value="其他">其他</option>
                     </select>
                 </div>
                 
@@ -1059,12 +536,12 @@
                     <label>计算类型</label>
                     <select name="calcType">
                         <option value="">选择类型</option>
-                        <option value="优化">几何优化</option>
-                        <option value="频率">频率计算</option>
-                        <option value="单点">单点能</option>
-                        <option value="过渡态">过渡态搜索</option>
-                        <option value="IRC">IRC计算</option>
-                        <option value="NMR">NMR预测</option>
+                        <option value="几何优化">几何优化</option>
+                        <option value="频率计算">频率计算</option>
+                        <option value="单点能">单点能</option>
+                        <option value="过渡态搜索">过渡态搜索</option>
+                        <option value="IRC计算">IRC计算</option>
+                        <option value="NMR预测">NMR预测</option>
                         <option value="UV-Vis">UV-Vis</option>
                     </select>
                 </div>
@@ -1085,7 +562,7 @@
                 </div>
                 
                 <div style="text-align: right; margin-top: 25px;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('addModal')">取消</button>
                     <button type="submit" class="btn btn-primary" style="margin-left: 10px;">保存</button>
                 </div>
             </form>
@@ -1093,10 +570,10 @@
     </div>
     
     <!-- 添加脚本模态框 -->
-    <div id="addScriptModal" class="modal">
+    <div id="scriptModal" class="modal">
         <div class="modal-content">
             <h2>添加新脚本</h2>
-            <form id="addScriptForm">
+            <form id="scriptForm">
                 <div class="form-group">
                     <label>脚本名称 *</label>
                     <input type="text" name="scriptName" required placeholder="例如：extract_energy.py">
@@ -1155,194 +632,368 @@
                 </div>
                 
                 <div style="text-align: right; margin-top: 25px;">
-                    <button type="button" class="btn btn-secondary" onclick="closeScriptModal()">取消</button>
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('scriptModal')">取消</button>
                     <button type="submit" class="btn btn-primary" style="margin-left: 10px;">保存脚本</button>
                 </div>
             </form>
         </div>
     </div>
+    
+    <!-- 文件上传模态框 -->
+    <div id="fileUploadModal" class="modal">
         <div class="modal-content">
-            <h2>添加新计算记录</h2>
-            <form id="addForm">
-                <div class="form-group">
-                    <label>分子名称 *</label>
-                    <input type="text" name="molecule" required placeholder="例如：苯、葡萄糖">
-                </div>
-                
-                <div class="form-group">
-                    <label>结构描述</label>
-                    <input type="text" name="structure" placeholder="例如：椅式构象、反式异构体">
-                </div>
-                
-                <div class="form-group">
-                    <label>计算方法 *</label>
-                    <select name="method" required>
-                        <option value="">选择方法</option>
-                        <option value="DFT-B3LYP">DFT-B3LYP</option>
-                        <option value="DFT-M06-2X">DFT-M06-2X</option>
-                        <option value="DFT-wB97XD">DFT-ωB97XD</option>
-                        <option value="MP2">MP2</option>
-                        <option value="CCSD(T)">CCSD(T)</option>
-                        <option value="HF">HF</option>
-                        <option value="Other">其他</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>基组</label>
-                    <select name="basis">
-                        <option value="">选择基组</option>
-                        <option value="6-31G(d)">6-31G(d)</option>
-                        <option value="6-31+G(d,p)">6-31+G(d,p)</option>
-                        <option value="6-311++G(d,p)">6-311++G(d,p)</option>
-                        <option value="cc-pVDZ">cc-pVDZ</option>
-                        <option value="cc-pVTZ">cc-pVTZ</option>
-                        <option value="cc-pVQZ">cc-pVQZ</option>
-                        <option value="def2-SVP">def2-SVP</option>
-                        <option value="def2-TZVP">def2-TZVP</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>计算类型</label>
-                    <select name="calcType">
-                        <option value="">选择类型</option>
-                        <option value="优化">几何优化</option>
-                        <option value="频率">频率计算</option>
-                        <option value="单点">单点能</option>
-                        <option value="过渡态">过渡态搜索</option>
-                        <option value="IRC">IRC计算</option>
-                        <option value="NMR">NMR预测</option>
-                        <option value="UV-Vis">UV-Vis</option>
-                    </select>
-                </div>
-                
-                <div class="form-group">
-                    <label>能量 (Hartree)</label>
-                    <input type="number" step="any" name="energy" placeholder="-78.123456">
-                </div>
-                
-                <div class="form-group">
-                    <label>文件路径</label>
-                    <input type="text" name="filepath" placeholder="例如：/path/to/calculation.out">
-                </div>
-                
-                <div class="form-group">
-                    <label>计算目的/备注</label>
-                    <textarea name="notes" placeholder="记录为什么要做这个计算，预期得到什么结果..."></textarea>
-                </div>
-                
-                <div style="text-align: right; margin-top: 25px;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">取消</button>
-                    <button type="submit" class="btn btn-primary" style="margin-left: 10px;">保存</button>
-                </div>
-            </form>
+            <h2>从文件导入计算记录</h2>
+            
+            <div class="file-drop-zone" onclick="triggerFileInput('calcFileInput')" 
+                 ondrop="handleFileDrop(event, 'calc')" 
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)">
+                <div class="file-drop-icon">📁</div>
+                <div class="file-drop-text">拖拽文件到这里或点击选择</div>
+                <div class="file-drop-hint">支持 .out, .log, .gjf, .com 等计算化学文件</div>
+            </div>
+            
+            <input type="file" id="calcFileInput" class="file-input" accept=".out,.log,.gjf,.com,.xyz,.mol" onchange="handleFileSelect(event, 'calc')" multiple>
+            
+            <div id="filePreviewContainer"></div>
+            
+            <div style="text-align: right; margin-top: 25px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('fileUploadModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="processFiles('calc')" style="margin-left: 10px;">处理文件</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 脚本文件上传模态框 -->
+    <div id="scriptFileUploadModal" class="modal">
+        <div class="modal-content">
+            <h2>从文件导入脚本</h2>
+            
+            <div class="file-drop-zone" onclick="triggerFileInput('scriptFileInput')" 
+                 ondrop="handleFileDrop(event, 'script')" 
+                 ondragover="handleDragOver(event)" 
+                 ondragleave="handleDragLeave(event)">
+                <div class="file-drop-icon">🐍</div>
+                <div class="file-drop-text">拖拽脚本文件到这里或点击选择</div>
+                <div class="file-drop-hint">支持 .py, .sh 脚本文件</div>
+            </div>
+            
+            <input type="file" id="scriptFileInput" class="file-input" accept=".py,.sh,.bash" onchange="handleFileSelect(event, 'script')" multiple>
+            
+            <div id="scriptFilePreviewContainer"></div>
+            
+            <div style="text-align: right; margin-top: 25px;">
+                <button type="button" class="btn btn-secondary" onclick="closeModal('scriptFileUploadModal')">取消</button>
+                <button type="button" class="btn btn-primary" onclick="processFiles('script')" style="margin-left: 10px;">导入脚本</button>
+            </div>
         </div>
     </div>
 
     <script>
-        // 存储所有记录
+        // 数据存储
         let records = JSON.parse(localStorage.getItem('chemRecords') || '[]');
         let scripts = JSON.parse(localStorage.getItem('chemScripts') || '[]');
-        let currentScriptFilter = 'all';
         let uploadedFiles = [];
-        let uploadedScriptFiles = [];
         
-        // 页面加载时初始化
+        // 页面初始化
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('系统初始化...');
+            
+            // 防止全局拖拽默认行为
+            document.addEventListener('dragover', function(e) {
+                e.preventDefault();
+            });
+            document.addEventListener('drop', function(e) {
+                e.preventDefault();
+            });
+            
+            // 初始化数据显示
             updateStats();
             renderRecords();
             updateScriptStats();
             renderScripts();
+            
+            // 绑定表单事件
+            document.getElementById('addForm').addEventListener('submit', handleAddRecord);
+            document.getElementById('scriptForm').addEventListener('submit', handleAddScript);
+            
+            console.log('系统初始化完成');
         });
         
         // 标签页切换
         function switchTab(tabName) {
-            // 隐藏所有标签页内容
+            console.log('切换到标签页:', tabName);
+            
+            // 隐藏所有标签页
             document.querySelectorAll('.tab-content').forEach(tab => {
                 tab.classList.remove('active');
             });
             
-            // 移除所有标签按钮的active状态
+            // 移除所有按钮的active状态
             document.querySelectorAll('.nav-tab').forEach(tab => {
                 tab.classList.remove('active');
             });
             
             // 显示选中的标签页
             document.getElementById(tabName + '-tab').classList.add('active');
-            
-            // 激活对应的标签按钮
             event.target.classList.add('active');
         }
         
-        // 打开添加计算模态框
-        function openModal() {
+        // 模态框管理
+        function openAddModal() {
             document.getElementById('addModal').style.display = 'block';
         }
         
-        // 关闭计算模态框
-        function closeModal() {
-            document.getElementById('addModal').style.display = 'none';
-            document.getElementById('addForm').reset();
-        }
-        
-        // 打开添加脚本模态框
         function openScriptModal() {
-            document.getElementById('addScriptModal').style.display = 'block';
+            document.getElementById('scriptModal').style.display = 'block';
         }
         
-        // 关闭脚本模态框
-        function closeScriptModal() {
-            document.getElementById('addScriptModal').style.display = 'none';
-            document.getElementById('addScriptForm').reset();
-        }
-        
-        // 打开文件上传模态框
-        function openFileUploadModal() {
+        function openFileUpload() {
             document.getElementById('fileUploadModal').style.display = 'block';
             uploadedFiles = [];
             document.getElementById('filePreviewContainer').innerHTML = '';
         }
         
-        // 关闭文件上传模态框
-        function closeFileUploadModal() {
-            document.getElementById('fileUploadModal').style.display = 'none';
-            uploadedFiles = [];
-            document.getElementById('filePreviewContainer').innerHTML = '';
-        }
-        
-        // 打开脚本文件上传模态框
         function openScriptFileUpload() {
             document.getElementById('scriptFileUploadModal').style.display = 'block';
-            uploadedScriptFiles = [];
+            uploadedFiles = [];
             document.getElementById('scriptFilePreviewContainer').innerHTML = '';
         }
         
-        // 关闭脚本文件上传模态框
-        function closeScriptFileUploadModal() {
-            document.getElementById('scriptFileUploadModal').style.display = 'none';
-            uploadedScriptFiles = [];
-            document.getElementById('scriptFilePreviewContainer').innerHTML = '';
+        function closeModal(modalId) {
+            document.getElementById(modalId).style.display = 'none';
+            
+            // 清理表单
+            if (modalId === 'addModal') {
+                document.getElementById('addForm').reset();
+            } else if (modalId === 'scriptModal') {
+                document.getElementById('scriptForm').reset();
+            }
+            
+            // 清理文件上传
+            uploadedFiles = [];
         }
         
         // 点击模态框外部关闭
         window.onclick = function(event) {
-            const modal1 = document.getElementById('addModal');
-            const modal2 = document.getElementById('addScriptModal');
-            const modal3 = document.getElementById('fileUploadModal');
-            const modal4 = document.getElementById('scriptFileUploadModal');
-            
-            if (event.target === modal1) closeModal();
-            if (event.target === modal2) closeScriptModal();
-            if (event.target === modal3) closeFileUploadModal();
-            if (event.target === modal4) closeScriptFileUploadModal();
+            if (event.target.classList.contains('modal')) {
+                event.target.style.display = 'none';
+            }
         }
         
-        // 处理计算表单提交
-        document.getElementById('addForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+        // 文件拖拽处理
+        function handleDragOver(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.add('drag-over');
+        }
+        
+        function handleDragLeave(event) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.remove('drag-over');
+        }
+        
+        function handleFileDrop(event, type) {
+            event.preventDefault();
+            event.stopPropagation();
+            event.currentTarget.classList.remove('drag-over');
             
-            const formData = new FormData(e.target);
+            const files = Array.from(event.dataTransfer.files);
+            console.log(`拖拽${type}文件:`, files.map(f => f.name));
+            
+            uploadedFiles = files;
+            displayFilePreview(files, type);
+        }
+        
+        function triggerFileInput(inputId) {
+            document.getElementById(inputId).click();
+        }
+        
+        function handleFileSelect(event, type) {
+            const files = Array.from(event.target.files);
+            console.log(`选择${type}文件:`, files.map(f => f.name));
+            
+            uploadedFiles = files;
+            displayFilePreview(files, type);
+        }
+        
+        // 显示文件预览
+        function displayFilePreview(files, type) {
+            const containerId = type === 'calc' ? 'filePreviewContainer' : 'scriptFilePreviewContainer';
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            
+            if (files.length === 0) return;
+            
+            files.forEach((file, index) => {
+                const preview = document.createElement('div');
+                preview.className = 'file-preview';
+                preview.innerHTML = `
+                    <div class="file-info">
+                        <span class="file-name">${file.name}</span>
+                        <span class="file-size">${(file.size / 1024).toFixed(1)} KB</span>
+                    </div>
+                    <div style="color: #6b7280; font-size: 0.9rem;">
+                        类型: ${file.type || '文本文件'} | 最后修改: ${new Date(file.lastModified).toLocaleDateString()}
+                    </div>
+                `;
+                container.appendChild(preview);
+            });
+            
+            const notice = document.createElement('div');
+            notice.className = 'success-notice';
+            notice.innerHTML = `✅ 已选择 ${files.length} 个文件，准备处理...`;
+            container.appendChild(notice);
+        }
+        
+        // 处理文件
+        async function processFiles(type) {
+            if (uploadedFiles.length === 0) {
+                alert('请先选择文件');
+                return;
+            }
+            
+            console.log(`开始处理${type}文件:`, uploadedFiles.map(f => f.name));
+            
+            try {
+                for (const file of uploadedFiles) {
+                    const content = await readFileContent(file);
+                    
+                    if (type === 'calc') {
+                        await processCalculationFile(file, content);
+                    } else if (type === 'script') {
+                        await processScriptFile(file, content);
+                    }
+                }
+                
+                // 更新显示
+                if (type === 'calc') {
+                    saveRecords();
+                    updateStats();
+                    renderRecords();
+                    closeModal('fileUploadModal');
+                } else {
+                    saveScripts();
+                    updateScriptStats();
+                    renderScripts();
+                    closeModal('scriptFileUploadModal');
+                }
+                
+                alert(`✅ 成功导入 ${uploadedFiles.length} 个${type === 'calc' ? '计算记录' : '脚本'}！`);
+                
+            } catch (error) {
+                console.error('处理文件时出错:', error);
+                alert('处理文件时出错：' + error.message);
+            }
+        }
+        
+        // 处理计算文件
+        async function processCalculationFile(file, content) {
+            const extractedInfo = extractCalculationInfo(content, file.name);
+            
+            const record = {
+                id: Date.now() + Math.random(),
+                molecule: extractedInfo.molecule || file.name.split('.')[0],
+                structure: extractedInfo.structure || '',
+                method: extractedInfo.method || '',
+                basis: extractedInfo.basis || '',
+                calcType: extractedInfo.calcType || '',
+                energy: extractedInfo.energy,
+                filepath: file.name,
+                notes: `从文件 ${file.name} 自动导入`,
+                date: new Date().toISOString().split('T')[0]
+            };
+            
+            records.push(record);
+            console.log('添加计算记录:', record.molecule);
+        }
+        
+        // 处理脚本文件
+        async function processScriptFile(file, content) {
+            const fileExt = file.name.split('.').pop().toLowerCase();
+            const language = fileExt === 'py' ? 'python' : fileExt === 'sh' || fileExt === 'bash' ? 'bash' : 'other';
+            
+            const script = {
+                id: Date.now() + Math.random(),
+                name: file.name,
+                language: language,
+                category: '其他',
+                description: `从文件 ${file.name} 自动导入的脚本`,
+                usage: '',
+                code: content,
+                filepath: file.name,
+                dependencies: '',
+                notes: `自动导入于 ${new Date().toLocaleString()}`,
+                date: new Date().toISOString().split('T')[0]
+            };
+            
+            scripts.push(script);
+            console.log('添加脚本:', script.name);
+        }
+        
+        // 读取文件内容
+        function readFileContent(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = e => resolve(e.target.result);
+                reader.onerror = () => reject(new Error('文件读取失败'));
+                reader.readAsText(file);
+            });
+        }
+        
+        // 提取计算信息
+        function extractCalculationInfo(content, filename) {
+            const info = {
+                molecule: '',
+                method: '',
+                basis: '',
+                energy: null,
+                calcType: '',
+                structure: ''
+            };
+            
+            // 提取能量
+            const energyPatterns = [
+                /SCF Done:.*E\(.*\)\s*=\s*([-\d.]+)/i,
+                /FINAL SINGLE POINT ENERGY\s*([-\d.]+)/i,
+                /Total Energy\s*=\s*([-\d.]+)/i,
+                /E\(RB3LYP\)\s*=\s*([-\d.]+)/i
+            ];
+            
+            for (const pattern of energyPatterns) {
+                const match = content.match(pattern);
+                if (match) {
+                    info.energy = parseFloat(match[1]);
+                    break;
+                }
+            }
+            
+            // 提取方法
+            if (content.includes('B3LYP')) info.method = 'DFT-B3LYP';
+            else if (content.includes('M06-2X')) info.method = 'DFT-M06-2X';
+            else if (content.includes('wB97XD')) info.method = 'DFT-wB97XD';
+            else if (content.includes('MP2')) info.method = 'MP2';
+            
+            // 提取基组
+            if (content.includes('6-31G(d)')) info.basis = '6-31G(d)';
+            else if (content.includes('6-31+G(d,p)')) info.basis = '6-31+G(d,p)';
+            else if (content.includes('cc-pVDZ')) info.basis = 'cc-pVDZ';
+            else if (content.includes('def2-TZVP')) info.basis = 'def2-TZVP';
+            
+            // 提取计算类型
+            if (content.includes('optimization') || content.includes('Optimization')) info.calcType = '几何优化';
+            else if (content.includes('frequency') || content.includes('Frequency')) info.calcType = '频率计算';
+            else if (content.includes('Single Point')) info.calcType = '单点能';
+            
+            return info;
+        }
+        
+        // 表单处理
+        function handleAddRecord(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
             const record = {
                 id: Date.now(),
                 molecule: formData.get('molecule'),
@@ -1360,14 +1011,15 @@
             saveRecords();
             updateStats();
             renderRecords();
-            closeModal();
-        });
-        
-        // 处理脚本表单提交
-        document.getElementById('addScriptForm').addEventListener('submit', function(e) {
-            e.preventDefault();
+            closeModal('addModal');
             
-            const formData = new FormData(e.target);
+            console.log('手动添加记录:', record.molecule);
+        }
+        
+        function handleAddScript(event) {
+            event.preventDefault();
+            
+            const formData = new FormData(event.target);
             const script = {
                 id: Date.now(),
                 name: formData.get('scriptName'),
@@ -1386,10 +1038,12 @@
             saveScripts();
             updateScriptStats();
             renderScripts();
-            closeScriptModal();
-        });
+            closeModal('scriptModal');
+            
+            console.log('手动添加脚本:', script.name);
+        }
         
-        // 保存记录到本地存储
+        // 数据存储
         function saveRecords() {
             localStorage.setItem('chemRecords', JSON.stringify(records));
         }
@@ -1398,7 +1052,7 @@
             localStorage.setItem('chemScripts', JSON.stringify(scripts));
         }
         
-        // 更新计算统计数据
+        // 统计更新
         function updateStats() {
             const totalRecords = records.length;
             const uniqueMolecules = new Set(records.map(r => r.molecule)).size;
@@ -1413,7 +1067,6 @@
             document.getElementById('thisMonth').textContent = thisMonthRecords;
         }
         
-        // 更新脚本统计数据
         function updateScriptStats() {
             const totalScripts = scripts.length;
             const pythonScripts = scripts.filter(s => s.language === 'python').length;
@@ -1437,7 +1090,7 @@
                 container.innerHTML = `
                     <div class="empty-state">
                         <h3>${filteredRecords ? '没有找到匹配的记录' : '还没有计算记录'}</h3>
-                        <p>${filteredRecords ? '尝试修改搜索条件' : '点击"添加新计算"开始记录你的第一个计算'}</p>
+                        <p>${filteredRecords ? '尝试修改搜索条件' : '点击"添加新计算"或"从文件导入"开始记录你的第一个计算'}</p>
                     </div>
                 `;
                 return;
@@ -1481,14 +1134,69 @@
             container.innerHTML = table;
         }
         
-        // 删除记录
-        function deleteRecord(id) {
-            if (confirm('确定要删除这条记录吗？')) {
-                records = records.filter(r => r.id !== id);
-                saveRecords();
-                updateStats();
-                renderRecords();
+        // 渲染脚本列表
+        function renderScripts(filteredScripts = null) {
+            const scriptsToShow = filteredScripts || scripts;
+            const container = document.getElementById('scriptsContainer');
+            
+            if (scriptsToShow.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h3>${filteredScripts ? '没有找到匹配的脚本' : '还没有脚本记录'}</h3>
+                        <p>${filteredScripts ? '尝试修改搜索条件' : '点击"添加新脚本"或"从文件导入脚本"开始管理你的第一个脚本'}</p>
+                    </div>
+                `;
+                return;
             }
+            
+            const scriptsHtml = scriptsToShow.map(script => `
+                <div class="script-card">
+                    <div class="script-header">
+                        <div class="script-title">${script.name}</div>
+                        <span class="script-language language-${script.language}">${script.language.toUpperCase()}</span>
+                    </div>
+                    
+                    <div class="script-description">${script.description}</div>
+                    
+                    <div style="color: #6b7280; font-size: 0.9rem; margin: 10px 0;">
+                        <span>📁 分类: ${script.category}</span> | 
+                        <span>📅 创建: ${script.date}</span>
+                        ${script.dependencies ? ` | 📦 依赖: ${script.dependencies}` : ''}
+                    </div>
+                    
+                    ${script.usage ? `
+                        <div style="margin-top: 10px;">
+                            <strong>使用示例:</strong>
+                            <div class="code-block">${script.usage}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${script.code ? `
+                        <div style="margin-top: 10px;">
+                            <strong>代码:</strong>
+                            <div class="code-block">${script.code}</div>
+                        </div>
+                    ` : ''}
+                    
+                    ${script.filepath ? `
+                        <div style="margin-top: 10px;">
+                            <strong>文件路径:</strong> <code>${script.filepath}</code>
+                        </div>
+                    ` : ''}
+                    
+                    ${script.notes ? `
+                        <div style="margin-top: 10px;">
+                            <strong>备注:</strong> ${script.notes}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="script-actions">
+                        <button class="btn btn-secondary" style="padding: 8px 16px; font-size: 0.9rem;" onclick="deleteScript(${script.id})">删除</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            container.innerHTML = scriptsHtml;
         }
         
         // 搜索过滤
@@ -1509,8 +1217,44 @@
             renderRecords(filtered);
         }
         
-        // 导出数据
-        function exportData() {
+        function filterScripts() {
+            const searchTerm = document.getElementById('scriptSearchInput').value.toLowerCase();
+            if (!searchTerm) {
+                renderScripts();
+                return;
+            }
+            
+            const filtered = scripts.filter(script => 
+                script.name.toLowerCase().includes(searchTerm) ||
+                script.description.toLowerCase().includes(searchTerm) ||
+                script.category.toLowerCase().includes(searchTerm) ||
+                (script.notes && script.notes.toLowerCase().includes(searchTerm))
+            );
+            
+            renderScripts(filtered);
+        }
+        
+        // 删除功能
+        function deleteRecord(id) {
+            if (confirm('确定要删除这条记录吗？')) {
+                records = records.filter(r => r.id !== id);
+                saveRecords();
+                updateStats();
+                renderRecords();
+            }
+        }
+        
+        function deleteScript(id) {
+            if (confirm('确定要删除这个脚本吗？')) {
+                scripts = scripts.filter(s => s.id !== id);
+                saveScripts();
+                updateScriptStats();
+                renderScripts();
+            }
+        }
+        
+        // 导出功能
+        function exportRecords() {
             const csv = [
                 ['日期', '分子', '结构', '方法', '基组', '类型', '能量', '文件路径', '备注'],
                 ...records.map(r => [
@@ -1526,10 +1270,33 @@
                 ])
             ].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
             
-            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            downloadCSV(csv, `计算记录_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+        
+        function exportScripts() {
+            const csv = [
+                ['脚本名称', '语言', '分类', '描述', '使用示例', '文件路径', '依赖', '备注', '创建日期'],
+                ...scripts.map(s => [
+                    s.name,
+                    s.language,
+                    s.category,
+                    s.description,
+                    s.usage,
+                    s.filepath,
+                    s.dependencies,
+                    s.notes,
+                    s.date
+                ])
+            ].map(row => row.map(cell => `"${cell || ''}"`).join(',')).join('\n');
+            
+            downloadCSV(csv, `脚本列表_${new Date().toISOString().split('T')[0]}.csv`);
+        }
+        
+        function downloadCSV(csvContent, filename) {
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
             const link = document.createElement('a');
             link.href = URL.createObjectURL(blob);
-            link.download = `计算记录_${new Date().toISOString().split('T')[0]}.csv`;
+            link.download = filename;
             link.click();
         }
     </script>
